@@ -55,7 +55,7 @@ class _LoginPageState extends State<LoginPage> {
         Navigator.pop(context);
       } catch (e) {
         Navigator.pop(context);
-        print("Login error: $e");
+        print("Login error: ${e.toString()}");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error de inicio de sesión: ${e.toString()}')),
         );

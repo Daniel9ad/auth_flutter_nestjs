@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:auth_flutter_nestjs/pages/auth_manager.dart';
-import 'package:http/http.dart' as http;
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
@@ -11,11 +11,12 @@ class AuthService {
   late final GoogleSignIn _googleSignIn;
 
   AuthService() {
-    _googleSignIn = GoogleSignIn(
-      clientId: kIsWeb 
-          ? '166910892553-te66nr05td8bp336tta0pukkkfjp5u03.apps.googleusercontent.com'  // ID de cliente para web
-          : null,  // Esto usará la configuración nativa en Android/iOS
-    );
+    _googleSignIn = GoogleSignIn();
+    // _googleSignIn = GoogleSignIn(
+    //   clientId: kIsWeb 
+    //       ? '166910892553-te66nr05td8bp336tta0pukkkfjp5u03.apps.googleusercontent.com'  // ID de cliente para web
+    //       : null,  // Esto usará la configuración nativa en Android/iOS
+    // );
   }
 
   Future<String> loginWithEmailPassword(String email, String password) async {
@@ -23,7 +24,7 @@ class AuthService {
       Uri.parse('http://localhost:8000/auth/login'),
       headers: {
           'Content-Type': 'application/json',
-        },
+      },
       body: jsonEncode({'email': email, 'password': password}),
     );
     if (response.statusCode == 201) {
@@ -42,31 +43,30 @@ class AuthService {
   }
 
   Future<String> loginWithGoogle() async {
-    try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) {
-        throw Exception('Google sign in was cancelled');
-      }
+    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    if (googleUser == null) {
+      throw Exception('Google sign in was cancelled');
+    }
+    print("Se creo googleUser:"+googleUser.toString());
+    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+    print("Se creo googleAuth:"+googleAuth.toString());
+    // Enviar el token de Google a tu backend
+    final response = await http.post(
+      Uri.parse('http://localhost:8000/auth/login-social'),
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: jsonEncode({'email': googleUser.email, 'provider': 'google'}),
+    );
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      
-      // Enviar el token de Google a tu backend
-      final response = await http.post(
-        Uri.parse('http://localhost:8000/auth/google'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'token': googleAuth.idToken}),
-      );
-
-      if (response.statusCode == 201) {
-        final token = jsonDecode(response.body)['access_token'];
-        await authManager.saveToken(token);
-        return token;
-      } else {
-        throw Exception('Failed to login with Google: ${response.body}');
-      }
-    } catch (error) {
-      print('Error during Google sign in: $error');
-      rethrow;
+    if (response.statusCode == 201) {
+      print("Todo salio bien:"+response.body);
+      authManager.saveToken(response.body);
+      return response.body;
+    } else {
+      print("Todo salio mal:"+response.body);
+      final data = jsonDecode(response.body);
+      throw Exception(data['message']);
     }
   }
 

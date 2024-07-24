@@ -42,7 +42,7 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
-        resValue "string", "server_client_id", "166910892553-te66nr05td8bp336tta0pukkkfjp5u03.apps.googleusercontent.com"
+        resValue "string", "server_client_id", "166910892553-jm1h7r35jnukcha45gh576vjk4letj8s.apps.googleusercontent.com"
     }
 
     buildTypes {
