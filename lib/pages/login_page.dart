@@ -1,6 +1,3 @@
-import 'package:auth_flutter_nestjs/components/my_button.dart';
-import 'package:auth_flutter_nestjs/components/my_textfield.dart';
-import 'package:auth_flutter_nestjs/components/square_tile.dart';
 import 'package:auth_flutter_nestjs/pages/auth_service.dart';
 import 'package:flutter/material.dart';
 
@@ -81,8 +78,22 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  Future<void> signUserInGighub() async {
-    print("Funcion de google y github");
+  Future<void> signUserInGithub() async {
+    showDialog(context: context, builder: (context) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    });
+    try {
+      await _authService.loginWithGithub();
+      Navigator.pop(context);
+    } catch (e) {
+      Navigator.pop(context);
+      print("Error de inicio de sesión: $e");
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error de inicio de sesión: ${e.toString()}')),
+      );
+    }
   }
 
   @override
@@ -218,7 +229,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         const SizedBox(width: 25),
                         ElevatedButton(
-                          onPressed: signUserInGighub,
+                          onPressed: signUserInGithub,
                           style: ElevatedButton.styleFrom(
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(8),

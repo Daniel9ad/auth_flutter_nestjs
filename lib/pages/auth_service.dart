@@ -1,27 +1,16 @@
 import 'dart:convert';
 import 'package:auth_flutter_nestjs/pages/auth_manager.dart';
 import 'package:google_sign_in/google_sign_in.dart';
-
+import 'package:flutter_web_auth/flutter_web_auth.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 class AuthService {
+  final String backendURL = "http://localhost:8000";
   final AuthManager authManager = AuthManager();
-
-  late final GoogleSignIn _googleSignIn;
-
-  AuthService() {
-    _googleSignIn = GoogleSignIn();
-    // _googleSignIn = GoogleSignIn(
-    //   clientId: kIsWeb 
-    //       ? '166910892553-te66nr05td8bp336tta0pukkkfjp5u03.apps.googleusercontent.com'  // ID de cliente para web
-    //       : null,  // Esto usará la configuración nativa en Android/iOS
-    // );
-  }
 
   Future<String> loginWithEmailPassword(String email, String password) async {
     final response = await http.post(
-      Uri.parse('http://localhost:8000/auth/login'),
+      Uri.parse('$backendURL/auth/login'),
       headers: {
           'Content-Type': 'application/json',
       },
@@ -43,16 +32,16 @@ class AuthService {
   }
 
   Future<String> loginWithGoogle() async {
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
     if (googleUser == null) {
       throw Exception('Google sign in was cancelled');
     }
     print("Se creo googleUser:"+googleUser.toString());
     final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
     print("Se creo googleAuth:"+googleAuth.toString());
-    // Enviar el token de Google a tu backend
     final response = await http.post(
-      Uri.parse('http://localhost:8000/auth/login-social'),
+      Uri.parse('$backendURL/auth/login-social'),
       headers: {
         'Content-Type': 'application/json'
       },
@@ -70,43 +59,70 @@ class AuthService {
     }
   }
 
-  // Future<String> loginWithGoogle() async {
-  //   final GoogleSignIn googleSignIn = GoogleSignIn();
-  //   final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-  //   final GoogleSignInAuthentication googleAuth = await googleUser!.authentication;
-  //   return 
-    // // Send the token to your backend
-    // final response = await http.post(
-    //   Uri.parse('http://your-api.com/auth/google'),
-    //   body: {'token': googleAuth.idToken},
-    // );
-    // if (response.statusCode == 200) {
-    //   // Parse and return the token
-    //   return response.body;
-    // } else {
-    //   throw Exception('Failed to login with Google');
-    // }
-  // }
+  Future<String> loginWithGithub() async {
+    const githubClientId = 'Ov23liNvdltLDLiUrSLq';
+    const githubClientSecret = 'ae9d307bb2447155ae897af9ab509be21cd7b054';
+    const redirectUrl = 'app.prueba.movil.ccbol.scheme://callback';
 
-  // Future<String> loginWithGithub() async {
-  //   final result = await FlutterWebAuth.authenticate(
-  //     url: "https://github.com/login/oauth/authorize?client_id=YOUR_CLIENT_ID&redirect_uri=YOUR_REDIRECT_URI",
-  //     callbackUrlScheme: "your.scheme"
-  //   );
-    
-  //   // Extract token from resulting url
-  //   final token = Uri.parse(result).queryParameters['code'];
-    
-  //   // Send the token to your backend
-  //   final response = await http.post(
-  //     Uri.parse('http://your-api.com/auth/github'),
-  //     body: {'code': token},
-  //   );
-  //   if (response.statusCode == 200) {
-  //     // Parse and return the token
-  //     return response.body;
-  //   } else {
-  //     throw Exception('Failed to login with GitHub');
-  //   }
-  // }
+    const url = 'https://github.com/login/oauth/authorize?client_id=$githubClientId&redirect_uri=$redirectUrl';
+    print("Url:"+url);
+    final result = await FlutterWebAuth.authenticate(
+      url: url,
+      callbackUrlScheme: "app.prueba.movil.ccbol.scheme"
+    );
+    print("Creacion:"+result.toString());
+    final code = Uri.parse(result).queryParameters['code'];
+
+    final response = await http.post(
+      Uri.parse('https://github.com/login/oauth/access_token'),
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: jsonEncode({
+        'client_id': githubClientId,
+        'client_secret': githubClientSecret,
+        'code': code,
+      }),
+    );
+    print("Respuesta1:"+response.toString());
+    if (response.statusCode == 200) {
+      final accessToken = jsonDecode(response.body)['access_token'];
+
+      // Obtener información del usuario
+      final userResponse = await http.get(
+        Uri.parse('https://api.github.com/user'),
+        headers: {
+          'Authorization': 'token $accessToken',
+        },
+      );
+
+      if (userResponse.statusCode == 200) {
+        final userData = jsonDecode(userResponse.body);
+        final email = userData['email'];
+
+        final backendResponse = await http.post(
+          Uri.parse('$backendURL/auth/login-social'),
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: jsonEncode({'email': email, 'provider': 'github'}),
+        );
+
+        if (backendResponse.statusCode == 201) {
+          print("Inicio de sesión con GitHub exitoso: " + backendResponse.body);
+          authManager.saveToken(backendResponse.body);
+          return backendResponse.body;
+        } else {
+          print("Error del backend: " + backendResponse.body);
+          final data = jsonDecode(backendResponse.body);
+          throw Exception(data['message']);
+        }
+      } else {
+        throw Exception('No se pudo obtener la información del usuario de GitHub');
+      }
+    } else {
+      throw Exception('Falló la autenticación de GitHub');
+    }
+  }
 }
